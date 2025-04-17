@@ -1,4 +1,11 @@
+// src/contexts/AuthContext.js
 import React, { createContext, useState, useEffect } from 'react';
+import { 
+  CognitoUser, 
+  AuthenticationDetails,
+  CognitoUserAttribute 
+} from 'amazon-cognito-identity-js';
+import { userPool, getHostedSignInURL } from '../cognito-config';
 
 export const AuthContext = createContext();
 
@@ -6,71 +13,126 @@ export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Check if user is logged in when the app loads
   useEffect(() => {
-    const storedUser = localStorage.getItem('labWebsiteUser');
-    if (storedUser) {
-      setCurrentUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
+    checkUser();
   }, []);
 
-  // Register function
-  const register = async (email, password, name) => {
-    // In a real app, we would make an API call to register the user
-    // For now, we'll simulate a successful registration
-    const newUser = { id: Date.now().toString(), email, name };
+  const checkUser = () => {
+    const cognitoUser = userPool.getCurrentUser();
     
-    // Store user in localStorage
-    localStorage.setItem('labWebsiteUser', JSON.stringify(newUser));
-    setCurrentUser(newUser);
-    
-    return newUser;
-  };
-
-  // Login function
-  const login = async (email, password) => {
-    // In a real app, we would make an API call to authenticate the user
-    // For now, we'll simulate a successful login with hardcoded values
-    if (email === "user@example.com" && password === "password") {
-      const user = { id: '1', email, name: 'Test User' };
-      
-      // Store user in localStorage
-      localStorage.setItem('labWebsiteUser', JSON.stringify(user));
-      setCurrentUser(user);
-      
-      return user;
+    if (cognitoUser) {
+      cognitoUser.getSession((err, session) => {
+        if (err) {
+          console.error('Session error:', err);
+          setCurrentUser(null);
+          setLoading(false);
+          return;
+        }
+        
+        if (session.isValid()) {
+          cognitoUser.getUserAttributes((err, attributes) => {
+            if (err) {
+              console.error('Get attributes error:', err);
+              setCurrentUser(null);
+            } else {
+              const userAttributes = {};
+              if (attributes) {
+                attributes.forEach(attribute => {
+                  userAttributes[attribute.Name] = attribute.Value;
+                });
+              }
+              
+              setCurrentUser({
+                username: cognitoUser.getUsername(),
+                ...userAttributes
+              });
+            }
+            setLoading(false);
+          });
+        } else {
+          setCurrentUser(null);
+          setLoading(false);
+        }
+      });
     } else {
-      throw new Error('Invalid email or password');
+      setCurrentUser(null);
+      setLoading(false);
     }
   };
 
-  // Logout function
-  const logout = async () => {
-    // Remove user from localStorage
-    localStorage.removeItem('labWebsiteUser');
-    setCurrentUser(null);
+  const signIn = (username, password) => {
+    return new Promise((resolve, reject) => {
+      const authDetails = new AuthenticationDetails({
+        Username: username,
+        Password: password
+      });
+      
+      const cognitoUser = new CognitoUser({
+        Username: username,
+        Pool: userPool
+      });
+      
+      cognitoUser.authenticateUser(authDetails, {
+        onSuccess: (result) => {
+          checkUser();
+          resolve(result);
+        },
+        onFailure: (err) => {
+          reject(err);
+        }
+      });
+    });
   };
 
-  // Update profile function
-  const updateProfile = async (userData) => {
-    // In a real app, we would make an API call to update the user's profile
-    const updatedUser = { ...currentUser, ...userData };
-    
-    // Update user in localStorage
-    localStorage.setItem('labWebsiteUser', JSON.stringify(updatedUser));
-    setCurrentUser(updatedUser);
-    
-    return updatedUser;
+  const hostedUISignIn = () => {
+    window.location.href = getHostedSignInURL();
+  };
+  
+  const logout = () => {
+    const cognitoUser = userPool.getCurrentUser();
+    if (cognitoUser) {
+      cognitoUser.signOut();
+      setCurrentUser(null);
+    }
+  };
+
+  const signUp = (username, password, attributes) => {
+    return new Promise((resolve, reject) => {
+      const attributeList = [];
+      
+      for (const key in attributes) {
+        attributeList.push(
+          new CognitoUserAttribute({
+            Name: key,
+            Value: attributes[key]
+          })
+        );
+      }
+      
+      userPool.signUp(
+        username,
+        password,
+        attributeList,
+        null,
+        (err, result) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          resolve(result);
+        }
+      );
+    });
   };
 
   const value = {
     currentUser,
-    loading,
-    register,
-    login,
+    signIn,
+    signUp,
+    hostedUISignIn,
     logout,
-    updateProfile
+    loading,
+    checkUser
   };
 
   return (

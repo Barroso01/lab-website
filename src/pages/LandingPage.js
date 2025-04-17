@@ -4,7 +4,7 @@ import './LandingPage.css';
 
 const LandingPage = () => {
   const [text, setText] = useState('');
-  const fullText = 'Welcome to the Lab Website';
+  const fullText = 'Welcome to the Lab Website , ';
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
