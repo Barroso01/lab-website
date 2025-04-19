@@ -10,9 +10,9 @@ const Footer = () => {
         <div className="footer-content">
           <p className="copyright">&copy; {year} Lab Website. All rights reserved.</p>
           <div className="footer-links">
-            <a href="#" className="footer-link">Terms</a>
-            <a href="#" className="footer-link">Privacy</a>
-            <a href="#" className="footer-link">Contact</a>
+            <a  className="footer-link">Terms</a>
+            <a  className="footer-link">Privacy</a>
+            <a  className="footer-link">Contact</a>
           </div>
         </div>
       </div>
